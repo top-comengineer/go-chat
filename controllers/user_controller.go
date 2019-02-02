@@ -428,7 +428,6 @@ func (c *AppContext) getUserByID(ID string) (*models.User, error) {
 }
 
 func (c *AppContext) getUserContactDetails(user *models.User) ([]interface{}, error) {
-	var details []interface{}
 	uniqueUsers := make(map[string]bool)
 	for _, id := range user.Contacts {
 		if _, ok := uniqueUsers[id]; !ok {
@@ -448,31 +447,32 @@ func (c *AppContext) getUserContactDetails(user *models.User) ([]interface{}, er
 		}
 	}
 
-	bIn := &dynamodb.BatchGetItemInput{
-		RequestItems: map[string]*dynamodb.KeysAndAttributes{},
+	in := &dynamodb.GetItemInput{
+		TableName: aws.String("GoChatUsers"),
+		ExpressionAttributeNames: map[string]*string{
+			"#name": aws.String("name"),
+		},
+		ProjectionExpression: aws.String("id,email,#name"),
 	}
 
+	details := make([]interface{}, len(uniqueUsers))
+	i := 0
 	for id := range uniqueUsers {
-		bIn.RequestItems["GoChatUsers"] = &dynamodb.KeysAndAttributes{
-			Keys: []map[string]*dynamodb.AttributeValue{
-				map[string]*dynamodb.AttributeValue{
-					"id": &dynamodb.AttributeValue{
-						S: aws.String(id),
-					},
-				},
+		in.Key = map[string]*dynamodb.AttributeValue{
+			"id": &dynamodb.AttributeValue{
+				S: aws.String(id),
 			},
-			ExpressionAttributeNames: map[string]*string{
-				"#name": aws.String("name"),
-			},
-			ProjectionExpression: aws.String("id,email,#name"),
 		}
-	}
 
-	bOut, err := c.DB.BatchGetItem(bIn)
-	if err != nil {
-		return nil, err
+		out, err := c.DB.GetItem(in)
+		if err != nil {
+			return nil, err
+		}
+		var u interface{}
+		dynamodbattribute.UnmarshalMap(out.Item, &u)
+		details[i] = u
+		i++
 	}
-	dynamodbattribute.UnmarshalListOfMaps(bOut.Responses["GoChatUsers"], &details)
 
 	return details, nil
 }
