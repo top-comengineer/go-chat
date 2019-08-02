@@ -16,7 +16,7 @@ import (
 // Connect will receive the $connect request
 // It will handle the authorization also
 func Connect(request APIGatewayWebsocketProxyRequest) (interface{}, error) {
-	if _, ok := request.RequestContext.Authorizer.(string); ok {
+	if request.RequestContext.Authorizer == nil {
 		return Authorizer(request)
 	}
 
